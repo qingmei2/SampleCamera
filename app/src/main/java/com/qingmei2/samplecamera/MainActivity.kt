@@ -27,6 +27,8 @@ class MainActivity : AppCompatActivity() {
                     Manifest.permission.CAMERA,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE
             ), REQUEST_PERMISSIONS_CODE)
+        } else {
+            startActivity(Intent(this, Camera1Activity::class.java))
         }
     }
 
