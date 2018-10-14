@@ -25,7 +25,8 @@
         </activity>
         <activity
             android:name=".Camera1Activity"
-            android:screenOrientation="landscape" />
+            android:screenOrientation="portrait"
+            android:theme="@style/theme_full_screen" />
     </application>
 
 </manifest>

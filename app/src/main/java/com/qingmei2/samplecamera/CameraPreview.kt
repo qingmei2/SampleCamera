@@ -3,19 +3,21 @@
 package com.qingmei2.samplecamera
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.hardware.Camera
+import android.support.v4.app.FragmentActivity
 import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import com.qingmei2.samplecamera.utils.CameraUtils
 import java.io.IOException
 
 @SuppressLint("ViewConstructor")
-class CameraPreview(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
+class CameraPreview(val mContext: FragmentActivity) : SurfaceView(mContext), SurfaceHolder.Callback {
 
     var mCamera: Camera? = null
 
-    private var faceInfo = CAMERA_FACE_BACKGROUND
+    var mCameraId = CAMERA_FACE_BACKGROUND
+        private set
 
     init {
         holder.addCallback(this)
@@ -51,27 +53,30 @@ class CameraPreview(context: Context) : SurfaceView(context), SurfaceHolder.Call
         }
     }
 
-    private fun getCameraInstance(camera: Int = CAMERA_FACE_BACKGROUND): Camera = Camera.open()
+    private fun getCameraInstance(cameraId: Int = CAMERA_FACE_BACKGROUND): Camera = Camera.open(cameraId)
 
     fun switchCameraFace() {
         stopPreviewAndFreeCamera()
 
-        when (faceInfo) {
+        when (mCameraId) {
             CAMERA_FACE_BACKGROUND ->
-                faceInfo = CAMERA_FACE_FOREGROUND
+                mCameraId = CAMERA_FACE_FOREGROUND
             CAMERA_FACE_FOREGROUND ->
-                faceInfo = CAMERA_FACE_BACKGROUND
+                mCameraId = CAMERA_FACE_BACKGROUND
         }
 
-        mCamera = getCameraInstance(faceInfo)
+        mCamera = getCameraInstance(mCameraId)
 
         startPreview()
     }
 
     private fun startPreview() {
         try {
-            mCamera?.setPreviewDisplay(holder)
-            mCamera?.startPreview()
+            mCamera?.apply {
+                CameraUtils.setCameraDisplayOrientation(mContext, mCameraId, this)
+                setPreviewDisplay(holder)
+                startPreview()
+            }
         } catch (e: IOException) {
             Log.d(TAG, "Error setting mCamera preview: ${e.message}")
         }
