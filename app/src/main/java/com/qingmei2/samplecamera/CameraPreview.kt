@@ -12,12 +12,11 @@ import com.qingmei2.samplecamera.utils.CameraUtils
 import java.io.IOException
 
 @SuppressLint("ViewConstructor")
-class CameraPreview(val mContext: FragmentActivity) : SurfaceView(mContext), SurfaceHolder.Callback {
+class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mContext), SurfaceHolder.Callback {
 
-    var mCamera: Camera? = null
+    private var mCamera: Camera? = null
 
-    var mCameraId = CAMERA_FACE_BACKGROUND
-        private set
+    private var mCameraId = CAMERA_FACE_BACKGROUND
 
     init {
         holder.addCallback(this)
@@ -39,10 +38,12 @@ class CameraPreview(val mContext: FragmentActivity) : SurfaceView(mContext), Sur
         mCamera?.apply {
             // Now that the size is known, set up the camera parameters and begin
             // the preview.
-            val size = parameters.supportedPreviewSizes[0]
+            val sizes = parameters.supportedPreviewSizes
 
             parameters?.also { params ->
-                params.setPreviewSize(size.width, size.height)
+                val closeSize = CameraUtils.getCloselyPreSize(width, height, sizes)
+
+                params.setPreviewSize(closeSize.width, closeSize.height)
                 requestLayout()
                 parameters = params
             }

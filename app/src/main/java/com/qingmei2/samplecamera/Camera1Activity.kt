@@ -10,15 +10,16 @@ import kotlin.properties.Delegates
 
 class Camera1Activity : AppCompatActivity() {
 
-    var mCameraPreview: CameraPreview by Delegates.notNull()
+    private var mCameraPreview: CameraPreview by Delegates.notNull()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_camera1)
 
         if (cameraHardwareAvailable()) {
-            mCameraPreview = CameraPreview(this).also {
-                cameraPreview.addView(it)
+            mCameraPreview = CameraPreview(this).apply {
+                keepScreenOn = true
+                flContainer.addView(this)
             }
         }
 
