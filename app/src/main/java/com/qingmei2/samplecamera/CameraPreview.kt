@@ -35,12 +35,10 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
     @Flash
     private var mFlashMode: Int = FLASH_OFF
 
-    var autoFocus: Boolean = false
+    private var autoFocus: Boolean = true
         set(value) {
-            if (field == value)
-                return
             field = value
-            setAutoFocusInternal(value)
+            setAutoFocusInternal(field)
         }
 
     init {
@@ -77,11 +75,11 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
         }
     }
 
-    private fun initCamera(autoFocusMode: Boolean = true) {
+    private fun initCamera(autoFocusPairProvider: () -> Pair<Boolean, Boolean> = { Pair(true, true) }) {
         mCamera = Camera.open(mCameraId)
 
-        if (autoFocusMode != autoFocus)
-            autoFocus = autoFocusMode
+        if (autoFocusPairProvider().first)
+            autoFocus = autoFocusPairProvider().second
     }
 
     fun switchCameraFace() {
@@ -161,4 +159,5 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
         /** Flash will be fired in red-eye reduction mode.  */
         const val FLASH_RED_EYE = 4
     }
+}
 }
