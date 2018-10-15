@@ -4,6 +4,7 @@ package com.qingmei2.samplecamera
 
 import android.annotation.SuppressLint
 import android.hardware.Camera
+import android.support.annotation.IntDef
 import android.support.v4.app.FragmentActivity
 import android.util.Log
 import android.view.SurfaceHolder
@@ -14,9 +15,33 @@ import java.io.IOException
 @SuppressLint("ViewConstructor")
 class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mContext), SurfaceHolder.Callback {
 
+    /** Direction the camera faces relative to device screen.  */
+    @IntDef(FACING_BACK,
+            FACING_FRONT)
+    annotation class Facing
+
+    /** The mode for for the camera device's flash control  */
+    @IntDef(FLASH_OFF,
+            FLASH_ON,
+            FLASH_TORCH,
+            FLASH_AUTO,
+            FLASH_RED_EYE)
+    annotation class Flash
+
     private var mCamera: Camera? = null
 
-    private var mCameraId = CAMERA_FACE_BACKGROUND
+    @Facing
+    private var mCameraId: Int = FACING_BACK
+    @Flash
+    private var mFlashMode: Int = FLASH_OFF
+
+    var autoFocus: Boolean = false
+        set(value) {
+            if (field == value)
+                return
+            field = value
+            setAutoFocusInternal(value)
+        }
 
     init {
         holder.addCallback(this)
@@ -25,7 +50,7 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
     override fun surfaceCreated(holder: SurfaceHolder?) {
         stopPreviewAndFreeCamera()
 
-        mCamera = Camera.open(CAMERA_FACE_BACKGROUND)
+        initCamera()
 
         startPreview()
     }
@@ -48,25 +73,28 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
                 parameters = params
             }
 
-            // Important: Call startPreview() to start updating the preview surface.
-            // Preview must be started before you can take a picture.
             startPreview()
         }
     }
 
-    private fun getCameraInstance(cameraId: Int = CAMERA_FACE_BACKGROUND): Camera = Camera.open(cameraId)
+    private fun initCamera(autoFocusMode: Boolean = true) {
+        mCamera = Camera.open(mCameraId)
+
+        if (autoFocusMode != autoFocus)
+            autoFocus = autoFocusMode
+    }
 
     fun switchCameraFace() {
         stopPreviewAndFreeCamera()
 
         when (mCameraId) {
-            CAMERA_FACE_BACKGROUND ->
-                mCameraId = CAMERA_FACE_FOREGROUND
-            CAMERA_FACE_FOREGROUND ->
-                mCameraId = CAMERA_FACE_BACKGROUND
+            FACING_BACK ->
+                mCameraId = FACING_FRONT
+            FACING_FRONT ->
+                mCameraId = FACING_BACK
         }
 
-        mCamera = getCameraInstance(mCameraId)
+        initCamera()
 
         startPreview()
     }
@@ -88,19 +116,49 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
             // Call stopPreview() to stop updating the preview surface.
             stopPreview()
 
-            // Important: Call release() to release the camera for use by other
-            // applications. Applications should release the camera immediately
-            // during onPause() and re-open() it during onResume()).
             release()
 
             mCamera = null
         }
     }
 
+    private fun setAutoFocusInternal(autoFocus: Boolean) {
+        val parameters = mCamera?.parameters?.apply {
+            focusMode = if (autoFocus && supportedFocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE)) {
+                Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE
+            } else if (supportedFocusModes.contains(Camera.Parameters.FOCUS_MODE_FIXED)) {
+                Camera.Parameters.FOCUS_MODE_FIXED
+            } else if (supportedFocusModes.contains(Camera.Parameters.FOCUS_MODE_INFINITY)) {
+                Camera.Parameters.FOCUS_MODE_INFINITY
+            } else {
+                supportedFocusModes[0]
+            }
+        }
+        mCamera?.parameters = parameters
+    }
+
     companion object {
         const val TAG = "CameraPreview"
 
-        const val CAMERA_FACE_BACKGROUND = 0
-        const val CAMERA_FACE_FOREGROUND = 1
+        /** The camera device faces the opposite direction as the device's screen.  */
+        const val FACING_BACK = 0
+
+        /** The camera device faces the same direction as the device's screen.  */
+        const val FACING_FRONT = 1
+
+        /** Flash will not be fired.  */
+        const val FLASH_OFF = 0
+
+        /** Flash will always be fired during snapshot.  */
+        const val FLASH_ON = 1
+
+        /** Constant emission of light during preview, auto-focus and snapshot.  */
+        const val FLASH_TORCH = 2
+
+        /** Flash will be fired automatically when required.  */
+        const val FLASH_AUTO = 3
+
+        /** Flash will be fired in red-eye reduction mode.  */
+        const val FLASH_RED_EYE = 4
     }
 }
