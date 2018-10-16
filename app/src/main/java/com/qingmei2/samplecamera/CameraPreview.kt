@@ -210,8 +210,6 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
 
             stopPreview()
 
-            val closeSize = CameraUtils.getCloselyPreSize(width, height, sizes)
-
             val params = parameters?.apply {
                 CameraUtils.getCloselyPreSize(width, height, sizes).also { closeSize ->
                     setPreviewSize(closeSize.width, closeSize.height)
@@ -241,34 +239,6 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
             ratio = it
         }
         return ratio ?: throw NullPointerException("chooseAspectRatio() result is null.")
-    }
-
-    private fun chooseOptimalSize(sizes: SortedSet<Size>): Size {
-        if (width == 0 || height == 0) { // Not yet laid out
-            return sizes.first() // Return the smallest size
-        }
-        val desiredWidth: Int
-        val desiredHeight: Int
-        val surfaceWidth = width
-        val surfaceHeight = height
-
-        val landscape = isLandscape(mDisplayOrientation)
-        if (landscape) {
-            desiredWidth = surfaceHeight
-            desiredHeight = surfaceWidth
-        } else {
-            desiredWidth = surfaceWidth
-            desiredHeight = surfaceHeight
-        }
-        var result: Size? = null
-        for (size in sizes) { // Iterate from small to large
-            val newSize = if (landscape) size else Size(size.height, size.width)
-            if (desiredWidth <= size.width && desiredHeight <= size.height) {
-                return newSize
-            }
-            result = size
-        }
-        return result!!
     }
 
     @SuppressLint("ObsoleteSdkInt")
