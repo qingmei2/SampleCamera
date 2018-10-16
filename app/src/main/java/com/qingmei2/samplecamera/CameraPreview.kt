@@ -37,8 +37,6 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
 
     private var mCamera: Camera? = null
 
-    private var mCameraParameters: Camera.Parameters? = null
-
     private var mCameraInfo = Camera.CameraInfo()
 
     @Facing
@@ -84,21 +82,7 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
     }
 
     override fun surfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
-        mCamera?.apply {
-            // Now that the size is known, set up the camera parameters and begin
-            // the preview.
-            val sizes = parameters.supportedPreviewSizes
 
-            parameters?.also { params ->
-                val closeSize = CameraUtils.getCloselyPreSize(width, height, sizes)
-
-                params.setPreviewSize(closeSize.width, closeSize.height)
-                requestLayout()
-                parameters = params
-            }
-
-            startPreview()
-        }
     }
 
     override fun onAttachedToWindow() {
@@ -120,17 +104,18 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
         if (autoFocusPairProvider().first)
             autoFocus = autoFocusPairProvider().second
 
-        mCameraParameters = mCamera?.parameters
-        mPreviewSizes.clear()
-        for (size in mCameraParameters!!.supportedPreviewSizes) {
-            mPreviewSizes.add(Size(size.width, size.height))
+        mCamera!!.parameters.apply {
+            mPreviewSizes.clear()
+            supportedPreviewSizes.forEach {
+                mPreviewSizes.add(Size(it.width, it.height))
+            }
+            mPictureSizes.clear()
+            supportedPictureSizes.forEach {
+                mPictureSizes.add(Size(it.width, it.height))
+            }
+            adjustCameraParameters()
         }
-        // Supported picture sizes;
-        mPictureSizes.clear()
-        for (size in mCameraParameters!!.supportedPreviewSizes) {
-            mPictureSizes.add(Size(size.width, size.height))
-        }
-        adjustCameraParameters()
+
         mCamera?.setDisplayOrientation(calcDisplayOrientation(mDisplayOrientation))
     }
 
@@ -217,27 +202,33 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
     }
 
     private fun adjustCameraParameters() {
-        var sizes = mPreviewSizes.sizes(mAspectRatio)
-        if (sizes == null) { // Not supported
-            mAspectRatio = chooseAspectRatio()
-            sizes = mPreviewSizes.sizes(mAspectRatio)
-        }
-        val size = chooseOptimalSize(sizes!!)
+        mCamera?.apply {
+            // Now that the size is known, set up the camera parameters and begin
+            // the preview.
+            val sizes = parameters.supportedPreviewSizes
+            val pictureSize = mPictureSizes.sizes(mAspectRatio)!!.last()
 
-        // Always re-apply camera parameters
-        // Largest picture size in this ratio
-        val pictureSize = mPictureSizes.sizes(mAspectRatio)!!.last()
-        if (mShowingPreview) {
-            mCamera?.stopPreview()
-        }
-        mCameraParameters?.setPreviewSize(size.width, size.height)
-        mCameraParameters?.setPictureSize(pictureSize.width, pictureSize.height)
-        mCameraParameters?.setRotation(calcCameraRotation(mDisplayOrientation))
-        setAutoFocusInternal(autoFocus)
-//        setFlashInternal(mFlashMode)
-        mCamera?.parameters = mCameraParameters
-        if (mShowingPreview) {
-            mCamera?.startPreview()
+            stopPreview()
+
+            val closeSize = CameraUtils.getCloselyPreSize(width, height, sizes)
+
+            val params = parameters?.apply {
+                CameraUtils.getCloselyPreSize(width, height, sizes).also { closeSize ->
+                    setPreviewSize(closeSize.width, closeSize.height)
+                }
+
+                setPictureSize(pictureSize.width, pictureSize.height)
+                setRotation(calcCameraRotation(mDisplayOrientation))
+
+                requestLayout()
+            }
+
+            parameters = params
+
+            setAutoFocusInternal(autoFocus)
+            // setFlashInternal(mFlashMode)
+
+            startPreview()
         }
     }
 
@@ -253,14 +244,16 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
     }
 
     private fun chooseOptimalSize(sizes: SortedSet<Size>): Size {
-        if (width != 0 && height != 0) { // Not yet laid out
+        if (width == 0 || height == 0) { // Not yet laid out
             return sizes.first() // Return the smallest size
         }
         val desiredWidth: Int
         val desiredHeight: Int
         val surfaceWidth = width
         val surfaceHeight = height
-        if (isLandscape(mDisplayOrientation)) {
+
+        val landscape = isLandscape(mDisplayOrientation)
+        if (landscape) {
             desiredWidth = surfaceHeight
             desiredHeight = surfaceWidth
         } else {
@@ -269,8 +262,9 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
         }
         var result: Size? = null
         for (size in sizes) { // Iterate from small to large
+            val newSize = if (landscape) size else Size(size.height, size.width)
             if (desiredWidth <= size.width && desiredHeight <= size.height) {
-                return size
+                return newSize
             }
             result = size
         }
@@ -283,16 +277,15 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
             return
         }
         mDisplayOrientation = displayOrientation
-        if (mCamera != null) {
-            mCameraParameters?.setRotation(calcCameraRotation(displayOrientation))
-            mCamera?.parameters = mCameraParameters
+        mCamera?.apply {
+            parameters.setRotation(calcCameraRotation(displayOrientation))
             val needsToStopPreview = mShowingPreview && Build.VERSION.SDK_INT < 14
             if (needsToStopPreview) {
-                mCamera?.stopPreview()
+                stopPreview()
             }
-            mCamera?.setDisplayOrientation(calcDisplayOrientation(displayOrientation))
+            setDisplayOrientation(calcDisplayOrientation(displayOrientation))
             if (needsToStopPreview) {
-                mCamera?.startPreview()
+                startPreview()
             }
         }
     }
