@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.qingmei2.samplecamera.data
+package com.qingmei2.samplecamera.entity
 
 import android.annotation.SuppressLint
 import android.os.Parcelable

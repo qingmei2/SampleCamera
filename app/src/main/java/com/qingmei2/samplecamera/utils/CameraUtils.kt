@@ -8,7 +8,6 @@ import android.hardware.Camera
 import android.os.Build
 import android.view.Surface
 
-
 object CameraUtils {
 
     @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)

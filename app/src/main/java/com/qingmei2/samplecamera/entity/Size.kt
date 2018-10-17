@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.qingmei2.samplecamera.data
+package com.qingmei2.samplecamera.entity
 
 /**
  * Immutable class for describing width and height dimensions in pixels.

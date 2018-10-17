@@ -11,16 +11,21 @@ import android.support.v4.view.ViewCompat
 import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import com.qingmei2.samplecamera.data.AspectRatio
-import com.qingmei2.samplecamera.data.Size
-import com.qingmei2.samplecamera.data.SizeMap
+import com.qingmei2.samplecamera.entity.AspectRatio
+import com.qingmei2.samplecamera.entity.Size
+import com.qingmei2.samplecamera.entity.SizeMap
 import com.qingmei2.samplecamera.utils.CameraUtils
 import com.qingmei2.samplecamera.utils.DisplayOrientationDetector
+import io.reactivex.Observable
+import io.reactivex.subjects.PublishSubject
 import java.io.IOException
-import java.util.*
 
 @SuppressLint("ViewConstructor")
-class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mContext), SurfaceHolder.Callback {
+class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContext), SurfaceHolder.Callback {
+
+    private val eventSubject: PublishSubject<String> = PublishSubject.create()
+    private val attachSubject: PublishSubject<Unit> = PublishSubject.create()
+    private val endSubject: PublishSubject<Unit> = PublishSubject.create()
 
     /** Direction the camera faces relative to device screen.  */
     @IntDef(FACING_BACK,
@@ -71,6 +76,10 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
         holder.addCallback(this)
     }
 
+    fun openCamera(): Observable<String> {
+        
+    }
+
     override fun surfaceCreated(holder: SurfaceHolder?) {
         initCamera()
 
@@ -81,7 +90,10 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
         stopPreviewAndFreeCamera()
     }
 
-    override fun surfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
+    override fun surfaceChanged(holder: SurfaceHolder?,
+                                format: Int,
+                                width: Int,
+                                height: Int) {
 
     }
 
@@ -313,7 +325,7 @@ class CameraPreview(private val mContext: FragmentActivity) : SurfaceView(mConte
     }
 
     companion object {
-        const val TAG = "CameraPreview"
+        const val TAG = "RxCameraView"
 
         /** The camera device faces the opposite direction as the device's screen.  */
         const val FACING_BACK = 0
