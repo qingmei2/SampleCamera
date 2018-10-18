@@ -20,12 +20,12 @@ import io.reactivex.Observable
 import io.reactivex.subjects.PublishSubject
 import java.io.IOException
 
-@SuppressLint("ViewConstructor")
+@SuppressWarnings("checkResult", "ViewConstructor")
 class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContext), SurfaceHolder.Callback {
 
-    private val eventSubject: PublishSubject<String> = PublishSubject.create()
-    private val attachSubject: PublishSubject<Unit> = PublishSubject.create()
-    private val endSubject: PublishSubject<Unit> = PublishSubject.create()
+    private var eventSubject: PublishSubject<String> = PublishSubject.create()
+    private var attachSubject: PublishSubject<FLAG> = PublishSubject.create()
+    private var endSubject: PublishSubject<FLAG> = PublishSubject.create()
 
     /** Direction the camera faces relative to device screen.  */
     @IntDef(FACING_BACK,
@@ -55,6 +55,8 @@ class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContex
 
     private val mPictureSizes = SizeMap()
 
+    private var isCreated = false
+
     private val mDisplayOrientationDetector = object : DisplayOrientationDetector(context) {
 
         override fun onDisplayOrientationChanged(displayOrientation: Int) {
@@ -76,14 +78,14 @@ class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContex
         holder.addCallback(this)
     }
 
-    fun openCamera(): Observable<String> {
-        
+    fun openCameraObservable(): Observable<String> {
+        openCameraAsync()
+        return eventSubject.takeUntil(endSubject)
     }
 
     override fun surfaceCreated(holder: SurfaceHolder?) {
-        initCamera()
-
-        startPreview()
+        isCreated = true
+        attachSubject.onNext(FLAG)
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder?) {
@@ -99,12 +101,35 @@ class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContex
 
     override fun onAttachedToWindow() {
         mDisplayOrientationDetector.enable(ViewCompat.getDisplay(this)!!)
+
+        endSubject = PublishSubject.create()
+
         super.onAttachedToWindow()
     }
 
     override fun onDetachedFromWindow() {
         mDisplayOrientationDetector.disable()
+
+        endSubject.onNext(FLAG)
+        endSubject.onComplete()
+        attachSubject.onComplete()
+
         super.onDetachedFromWindow()
+    }
+
+    private fun openCameraAsync() {
+        if (isCreated) {
+            openCamera()
+        } else {
+            attachSubject.subscribe {
+                openCamera()
+            }
+        }
+    }
+
+    private fun openCamera() {
+        initCamera()
+        startPreview()
     }
 
     private fun initCamera(autoFocusPairProvider: () -> Pair<Boolean, Boolean> = { Pair(true, true) }) {
@@ -129,6 +154,9 @@ class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContex
         }
 
         mCamera?.setDisplayOrientation(calcDisplayOrientation(mDisplayOrientation))
+        mCamera?.setPreviewCallback { datas: ByteArray, camera: Camera ->
+            eventSubject.onNext("accept datas:$datas")
+        }
     }
 
     private fun selectCamera() {
@@ -351,3 +379,5 @@ class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContex
         val DEFAULT_ASPECT_RATIO = AspectRatio.of(4, 3)
     }
 }
+
+object FLAG
