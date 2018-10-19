@@ -1,8 +1,9 @@
 package com.qingmei2.samplecamera.core
 
+import io.reactivex.Flowable
 import io.reactivex.Single
 
-interface ICamera {
+interface IRxCamera {
 
     fun openCamera(): Single<Boolean>
 
@@ -11,4 +12,6 @@ interface ICamera {
     fun switchFlashMode(): Single<Boolean>
 
     fun switchFaceMode(): Single<Boolean>
+
+    fun fetchPreviewFlowable(): Flowable<ByteArray>
 }

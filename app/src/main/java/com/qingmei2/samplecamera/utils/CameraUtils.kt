@@ -3,15 +3,15 @@
 package com.qingmei2.samplecamera.utils
 
 import android.annotation.TargetApi
-import android.app.Activity
 import android.hardware.Camera
 import android.os.Build
+import android.support.v4.app.FragmentActivity
 import android.view.Surface
 
 object CameraUtils {
 
     @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-    fun setCameraDisplayOrientation(activity: Activity,
+    fun setCameraDisplayOrientation(activity: FragmentActivity,
                                     cameraId: Int = 0,
                                     camera: Camera) {
         val info = Camera.CameraInfo()

@@ -1,6 +1,6 @@
 @file:Suppress("DEPRECATION")
 
-package com.qingmei2.samplecamera
+package com.qingmei2.samplecamera.core.impl
 
 import android.annotation.SuppressLint
 import android.hardware.Camera
@@ -9,23 +9,31 @@ import android.support.annotation.IntDef
 import android.support.v4.app.FragmentActivity
 import android.support.v4.view.ViewCompat
 import android.util.Log
-import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.ViewGroup
+import com.qingmei2.samplecamera.core.IRxCamera
+import com.qingmei2.samplecamera.core.preview.ICameraPreview
 import com.qingmei2.samplecamera.entity.AspectRatio
 import com.qingmei2.samplecamera.entity.Size
 import com.qingmei2.samplecamera.entity.SizeMap
 import com.qingmei2.samplecamera.utils.CameraUtils
 import com.qingmei2.samplecamera.utils.DisplayOrientationDetector
-import io.reactivex.Observable
+import io.reactivex.Flowable
+import io.reactivex.Single
+import io.reactivex.processors.PublishProcessor
 import io.reactivex.subjects.PublishSubject
 import java.io.IOException
 
 @SuppressWarnings("checkResult", "ViewConstructor")
-class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContext), SurfaceHolder.Callback {
+class Camera1(private val mContext: FragmentActivity,
+              private val mParent: ViewGroup,
+              private val mCameraPreview: ICameraPreview) : IRxCamera {
 
-    private var eventSubject: PublishSubject<String> = PublishSubject.create()
-    private var attachSubject: PublishSubject<FLAG> = PublishSubject.create()
-    private var endSubject: PublishSubject<FLAG> = PublishSubject.create()
+    private var openCameraSubject: PublishSubject<Boolean> = PublishSubject.create()
+
+    private var previewProcessor: PublishProcessor<ByteArray> = PublishProcessor.create()
+    private var attachProcessor: PublishProcessor<Unit> = PublishProcessor.create()
+    private var endProcessor: PublishProcessor<Unit> = PublishProcessor.create()
 
     /** Direction the camera faces relative to device screen.  */
     @IntDef(FACING_BACK,
@@ -57,11 +65,37 @@ class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContex
 
     private var isCreated = false
 
-    private val mDisplayOrientationDetector = object : DisplayOrientationDetector(context) {
+    private val mDisplayOrientationDetector = object : DisplayOrientationDetector(mContext) {
 
         override fun onDisplayOrientationChanged(displayOrientation: Int) {
             setDisplayOrientation(displayOrientation)
         }
+    }
+
+    override fun openCamera(): Single<Boolean> {
+        openCameraAsync()
+        return openCameraSubject
+                .single(false)
+    }
+
+    override fun closeCamera(): Single<Boolean> = Single.create { emitter ->
+        stopPreviewAndFreeCamera()
+        emitter.onSuccess(true)
+    }
+
+    override fun switchFlashMode(): Single<Boolean> = Single.create { emitter ->
+        switchCameraFace()
+        emitter.onSuccess(true)
+    }
+
+    override fun switchFaceMode(): Single<Boolean> = Single.create { emitter ->
+        switchCameraFace()
+        emitter.onSuccess(true)
+    }
+
+    override fun fetchPreviewFlowable(): Flowable<ByteArray> {
+        openCameraAsync()
+        return previewProcessor.takeUntil(endProcessor)
     }
 
     private var autoFocus: Boolean = true
@@ -75,61 +109,49 @@ class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContex
     private var mDisplayOrientation: Int = 0
 
     init {
-        holder.addCallback(this)
-    }
+        mCameraPreview.apply {
+            onSurfaceChanged {
+                isCreated = true
+                attachProcessor.onNext(Unit)
+                endProcessor = PublishProcessor.create()
 
-    fun openCameraObservable(): Observable<String> {
-        openCameraAsync()
-        return eventSubject.takeUntil(endSubject)
-    }
+                mDisplayOrientationDetector.enable(ViewCompat.getDisplay(mCameraPreview.getView())!!)
+            }
 
-    override fun surfaceCreated(holder: SurfaceHolder?) {
-        isCreated = true
-        attachSubject.onNext(FLAG)
-    }
+            onSurfaceCreated {
 
-    override fun surfaceDestroyed(holder: SurfaceHolder?) {
-        stopPreviewAndFreeCamera()
-    }
+            }
 
-    override fun surfaceChanged(holder: SurfaceHolder?,
-                                format: Int,
-                                width: Int,
-                                height: Int) {
+            onSurfaceDestroy {
+                stopPreviewAndFreeCamera()
 
-    }
+                mDisplayOrientationDetector.disable()
 
-    override fun onAttachedToWindow() {
-        mDisplayOrientationDetector.enable(ViewCompat.getDisplay(this)!!)
-
-        endSubject = PublishSubject.create()
-
-        super.onAttachedToWindow()
-    }
-
-    override fun onDetachedFromWindow() {
-        mDisplayOrientationDetector.disable()
-
-        endSubject.onNext(FLAG)
-        endSubject.onComplete()
-        attachSubject.onComplete()
-
-        super.onDetachedFromWindow()
-    }
-
-    private fun openCameraAsync() {
-        if (isCreated) {
-            openCamera()
-        } else {
-            attachSubject.subscribe {
-                openCamera()
+                endProcessor.onNext(Unit)
+                endProcessor.onComplete()
+                attachProcessor.onComplete()
             }
         }
     }
 
-    private fun openCamera() {
+    private fun openCameraAsync() {
+        openCameraSubject = PublishSubject.create()
+
+        if (isCreated) {
+            openCameraInternal()
+        } else {
+            attachProcessor.subscribe {
+                openCameraInternal()
+            }
+        }
+    }
+
+    private fun openCameraInternal() {
         initCamera()
         startPreview()
+
+        openCameraSubject.onNext(true)
+        openCameraSubject.onComplete()
     }
 
     private fun initCamera(autoFocusPairProvider: () -> Pair<Boolean, Boolean> = { Pair(true, true) }) {
@@ -154,8 +176,8 @@ class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContex
         }
 
         mCamera?.setDisplayOrientation(calcDisplayOrientation(mDisplayOrientation))
-        mCamera?.setPreviewCallback { datas: ByteArray, camera: Camera ->
-            eventSubject.onNext("accept datas:$datas")
+        mCamera?.setPreviewCallback { bytes: ByteArray, _: Camera ->
+            previewProcessor.onNext(bytes)
         }
     }
 
@@ -188,7 +210,9 @@ class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContex
         try {
             mCamera?.apply {
                 CameraUtils.setCameraDisplayOrientation(mContext, mCameraId, this)
-                setPreviewDisplay(holder)
+
+                val surfaceView = mCameraPreview.getView() as SurfaceView
+                setPreviewDisplay(surfaceView.holder)
                 mShowingPreview = true
                 startPreview()
             }
@@ -251,14 +275,16 @@ class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContex
             stopPreview()
 
             val params = parameters?.apply {
-                CameraUtils.getCloselyPreSize(width, height, sizes).also { closeSize ->
+                CameraUtils.getCloselyPreSize(
+                        mCameraPreview.getSize().first,
+                        mCameraPreview.getSize().second,
+                        sizes
+                ).also { closeSize ->
                     setPreviewSize(closeSize.width, closeSize.height)
                 }
 
                 setPictureSize(pictureSize.width, pictureSize.height)
                 setRotation(calcCameraRotation(mDisplayOrientation))
-
-                requestLayout()
             }
 
             parameters = params
@@ -353,7 +379,7 @@ class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContex
     }
 
     companion object {
-        const val TAG = "RxCameraView"
+        const val TAG = "Camera1"
 
         /** The camera device faces the opposite direction as the device's screen.  */
         const val FACING_BACK = 0
@@ -379,5 +405,3 @@ class RxCameraView(private val mContext: FragmentActivity) : SurfaceView(mContex
         val DEFAULT_ASPECT_RATIO = AspectRatio.of(4, 3)
     }
 }
-
-object FLAG
