@@ -5,37 +5,44 @@ package com.qingmei2.samplecamera
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
+import android.util.Log
 import com.qingmei2.samplecamera.core.RxCamera
-import com.qingmei2.samplecamera.core.impl.Camera1
 import kotlinx.android.synthetic.main.activity_camera1.*
 import kotlin.properties.Delegates
 
 @SuppressWarnings("checkResult")
 class Camera1Activity : AppCompatActivity() {
 
-    private var mCameraView: Camera1 by Delegates.notNull()
+    private var mCamera: RxCamera by Delegates.notNull()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_camera1)
 
         if (cameraHardwareAvailable()) {
-            RxCamera
+            mCamera = RxCamera
                     .build(this, flContainer) {
                         autoFocus = true
                         useBackCamera = true
+                    }.apply {
+                        openCamera()
+                                .subscribe({ result: Boolean ->
+                                    Log.d(TAG, "openCamera() successfully: $result")
+                                }, {
+                                    Log.d(TAG, "openCamera() failed: ${it.message}")
+                                    it.printStackTrace()
+                                })
                     }
-                    .openCamera()
-                    .subscribe({ result: Boolean ->
-                        println("openCamera() successfully: $result")
-                    }, {
-                        println("openCamera() failed: ${it.message}")
-                        it.printStackTrace()
-                    })
         }
 
-        btnSwitch.setOnClickListener {
-            mCameraView.switchCameraFace()
+        btnSwitch.setOnClickListener { _ ->
+            mCamera.switchFaceMode()
+                    .subscribe({ result: Boolean ->
+                        Log.d(TAG, "switchFaceMode() successfully: $result")
+                    }, {
+                        Log.d(TAG, "switchFaceMode() failed: ${it.message}")
+                        it.printStackTrace()
+                    })
         }
 
         btnCapture.setOnClickListener {

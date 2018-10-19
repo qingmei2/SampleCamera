@@ -1,17 +1,19 @@
-@file:Suppress("DEPRECATION")
-
-package com.qingmei2.samplecamera.core.impl
+package com.qingmei2.samplecamera.core.camera
 
 import android.annotation.SuppressLint
 import android.hardware.Camera
 import android.os.Build
-import android.support.annotation.IntDef
 import android.support.v4.app.FragmentActivity
 import android.support.v4.view.ViewCompat
 import android.util.Log
 import android.view.SurfaceView
-import android.view.ViewGroup
+import com.qingmei2.samplecamera.core.Facing
+import com.qingmei2.samplecamera.core.Flash
 import com.qingmei2.samplecamera.core.IRxCamera
+import com.qingmei2.samplecamera.core.RxCamera.Companion.DEFAULT_ASPECT_RATIO
+import com.qingmei2.samplecamera.core.RxCamera.Companion.FACING_BACK
+import com.qingmei2.samplecamera.core.RxCamera.Companion.FACING_FRONT
+import com.qingmei2.samplecamera.core.RxCamera.Companion.FLASH_OFF
 import com.qingmei2.samplecamera.core.preview.ICameraPreview
 import com.qingmei2.samplecamera.entity.AspectRatio
 import com.qingmei2.samplecamera.entity.Size
@@ -24,29 +26,18 @@ import io.reactivex.processors.PublishProcessor
 import io.reactivex.subjects.PublishSubject
 import java.io.IOException
 
+@Suppress("DEPRECATION")
 @SuppressWarnings("checkResult", "ViewConstructor")
 class Camera1(private val mContext: FragmentActivity,
-              private val mParent: ViewGroup,
               private val mCameraPreview: ICameraPreview) : IRxCamera {
 
     private var openCameraSubject: PublishSubject<Boolean> = PublishSubject.create()
 
     private var previewProcessor: PublishProcessor<ByteArray> = PublishProcessor.create()
+
     private var attachProcessor: PublishProcessor<Unit> = PublishProcessor.create()
+
     private var endProcessor: PublishProcessor<Unit> = PublishProcessor.create()
-
-    /** Direction the camera faces relative to device screen.  */
-    @IntDef(FACING_BACK,
-            FACING_FRONT)
-    annotation class Facing
-
-    /** The mode for for the camera device's flash control  */
-    @IntDef(FLASH_OFF,
-            FLASH_ON,
-            FLASH_TORCH,
-            FLASH_AUTO,
-            FLASH_RED_EYE)
-    annotation class Flash
 
     private var mCamera: Camera? = null
 
@@ -64,6 +55,10 @@ class Camera1(private val mContext: FragmentActivity,
     private val mPictureSizes = SizeMap()
 
     private var isCreated = false
+
+    private var mShowingPreview = false
+
+    private var mDisplayOrientation: Int = 0
 
     private val mDisplayOrientationDetector = object : DisplayOrientationDetector(mContext) {
 
@@ -104,10 +99,6 @@ class Camera1(private val mContext: FragmentActivity,
             setAutoFocusInternal(field)
         }
 
-    private var mShowingPreview = false
-
-    private var mDisplayOrientation: Int = 0
-
     init {
         mCameraPreview.apply {
             onSurfaceChanged {
@@ -116,10 +107,6 @@ class Camera1(private val mContext: FragmentActivity,
                 endProcessor = PublishProcessor.create()
 
                 mDisplayOrientationDetector.enable(ViewCompat.getDisplay(mCameraPreview.getView())!!)
-            }
-
-            onSurfaceCreated {
-
             }
 
             onSurfaceDestroy {
@@ -147,10 +134,13 @@ class Camera1(private val mContext: FragmentActivity,
     }
 
     private fun openCameraInternal() {
-        initCamera()
-        startPreview()
-
-        openCameraSubject.onNext(true)
+        try {
+            initCamera()
+            startPreview()
+            openCameraSubject.onNext(true)
+        } catch (e: Exception) {
+            openCameraSubject.onNext(false)
+        }
         openCameraSubject.onComplete()
     }
 
@@ -193,7 +183,7 @@ class Camera1(private val mContext: FragmentActivity,
         mCameraId = -1
     }
 
-    fun switchCameraFace() {
+    private fun switchCameraFace() {
         when (mCameraId) {
             FACING_BACK ->
                 mCameraId = FACING_FRONT
@@ -202,7 +192,6 @@ class Camera1(private val mContext: FragmentActivity,
         }
 
         initCamera()
-
         startPreview()
     }
 
@@ -247,7 +236,7 @@ class Camera1(private val mContext: FragmentActivity,
         mCamera?.parameters = parameters
     }
 
-    fun setAspectRatio(ratio: AspectRatio): Boolean {
+    private fun setAspectRatio(ratio: AspectRatio): Boolean {
         if (mCamera == null) {
             // Handle this later when camera is opened
             mAspectRatio = ratio
@@ -380,28 +369,5 @@ class Camera1(private val mContext: FragmentActivity,
 
     companion object {
         const val TAG = "Camera1"
-
-        /** The camera device faces the opposite direction as the device's screen.  */
-        const val FACING_BACK = 0
-
-        /** The camera device faces the same direction as the device's screen.  */
-        const val FACING_FRONT = 1
-
-        /** Flash will not be fired.  */
-        const val FLASH_OFF = 0
-
-        /** Flash will always be fired during snapshot.  */
-        const val FLASH_ON = 1
-
-        /** Constant emission of light during preview, auto-focus and snapshot.  */
-        const val FLASH_TORCH = 2
-
-        /** Flash will be fired automatically when required.  */
-        const val FLASH_AUTO = 3
-
-        /** Flash will be fired in red-eye reduction mode.  */
-        const val FLASH_RED_EYE = 4
-
-        val DEFAULT_ASPECT_RATIO = AspectRatio.of(4, 3)
     }
 }
